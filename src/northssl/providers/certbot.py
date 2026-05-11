@@ -236,15 +236,27 @@ class CertbotProvider:
         session = self._build_manual_dns_session(session_id, domain)
         self._ensure_manual_dns_hooks()
 
+        data_dir = self.settings.data_dir if self.settings is not None else Path.home() / ".northssl"
+        letsencrypt_config_dir = data_dir / "letsencrypt" / "config"
+        letsencrypt_work_dir = data_dir / "letsencrypt" / "work"
+        letsencrypt_logs_dir = data_dir / "letsencrypt" / "logs"
+        for d in (letsencrypt_config_dir, letsencrypt_work_dir, letsencrypt_logs_dir):
+            d.mkdir(parents=True, exist_ok=True)
+
         command = [
             binary_path,
             "certonly",
             "--manual",
             "--preferred-challenges",
             "dns",
-            "--manual-public-ip-logging-ok",
             "--non-interactive",
             "--agree-tos",
+            "--config-dir",
+            str(letsencrypt_config_dir),
+            "--work-dir",
+            str(letsencrypt_work_dir),
+            "--logs-dir",
+            str(letsencrypt_logs_dir),
             "--cert-name",
             domain,
             "-d",
@@ -446,6 +458,12 @@ exit 0
                 return
 
             if process is not None and process.poll() is not None:
+                try:
+                    out, err = process.communicate(timeout=2)
+                except Exception:
+                    out, err = "", ""
+                certbot_output = ((out or "") + (err or "")).strip()
+                session.raw_output = certbot_output or "certbot exited with no output"
                 session.status = "failed"
                 break
 
@@ -460,4 +478,5 @@ exit 0
             session.status = "waiting"
             return
 
-        raise RuntimeError("Certbot did not produce a DNS challenge in time")
+        certbot_error = getattr(session, "raw_output", "") or "no output"
+        raise RuntimeError(f"Certbot exited before producing a DNS challenge. Output: {certbot_error}")
