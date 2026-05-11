@@ -1,0 +1,36 @@
+services:
+  api:
+    build:
+      context: .
+    user: "0:0"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8000:8000"
+    environment:
+      NORTHSSL_ENVIRONMENT: development
+      NORTHSSL_DATA_DIR: /home/northssl/.northssl
+      NORTHSSL_ACME_STAGING: "true"
+    volumes:
+      - northssl-data:/home/northssl/.northssl
+      - acme-webroot:/var/www/html
+      - letsencrypt-config:/etc/letsencrypt
+      - letsencrypt-lib:/var/lib/letsencrypt
+      - letsencrypt-log:/var/log/letsencrypt
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_NORTHSSL_API_URL: http://localhost:8000
+    depends_on:
+      - api
+
+volumes:
+  northssl-data:
+  acme-webroot:
+  letsencrypt-config:
+  letsencrypt-lib:
+  letsencrypt-log:
